@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PACS with Reporting</title>
+  <link rel="stylesheet" href="https://unpkg.com/cornerstone-tools/dist/cornerstoneTools.min.css">
+  <script src="https://unpkg.com/cornerstone-core/dist/cornerstone.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-wado-image-loader/dist/cornerstoneWADOImageLoader.min.js"></script>
+  <script src="https://unpkg.com/dicomParser/dist/dicomParser.min.js"></script>
+  <script src="https://unpkg.com/cornerstone-tools/dist/cornerstoneTools.min.js"></script>
+  <style>
+    #cornerstone-element {
+      width: 100%;
+      height: 80vh;
+      position: relative;
+      background-color: black;
+    }
+    #controls {
+      margin: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="loadImage">Load Image</button>
+    <input type="text" id="imageId" placeholder="Enter Image ID">
+    <button id="annotate">Annotate</button>
+  </div>
+  <div id="cornerstone-element"></div>
+
+  <div id="reporting">
+    <h2>Create Report</h2>
+    <form id="report-form">
+      <label for="patient-id">Patient ID:</label>
+      <input type="text" id="patient-id" name="patient-id" required>
+
+      <label for="study-uid">Study UID:</label>
+      <input type="text" id="study-uid" name="study-uid" required>
+
+      <label for="findings">Findings:</label>
+      <textarea id="findings" name="findings" rows="5" required></textarea>
+
+      <button type="submit">Save Report</button>
+    </form>
+
+    <h2>Reports</h2>
+    <table id="reports-table">
+      <thead>
+        <tr>
+          <th>Patient ID</th>
+          <th>Study UID</th>
+          <th>Created At</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    // Initialize Cornerstone
+    cornerstone.enable(document.getElementById('cornerstone-element'));
+
+    // Load DICOM image from Orthanc
+    document.getElementById('loadImage').addEventListener('click', function() {
+      const imageId = document.getElementById('imageId').value;
+      cornerstone.loadImage(imageId).then(function(image) {
+        cornerstone.displayImage(document.getElementById('cornerstone-element'), image);
+      }).catch(function(err) {
+        console.error(err);
+      });
+    });
+
+    // Annotation functionality
+    document.getElementById('annotate').addEventListener('click', function() {
+      const element = document.getElementById('cornerstone-element');
+      cornerstoneTools.addTool(cornerstoneTools.TextMarkerTool);
+      cornerstoneTools.setToolActive('TextMarker', { mouseButtonMask: 1 });
+      cornerstoneTools.setToolOptions('TextMarker', {
+        fontSize: 20,
+        color: 'yellow'
+      });
+      cornerstoneTools.setToolActive('TextMarker', { mouseButtonMask: 1 });
+    });
+
+    // Report form submission
+    document.getElementById('report-form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const patientId = document.getElementById('patient-id').value;
+      const studyUid = document.getElementById('study-uid').value;
+      const findings = document.getElementById('findings').value;
+
+      fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ patient_id: patientId, study_uid: studyUid, findings: findings })
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Clear form fields
+        document.getElementById('patient-id').value = '';
+        document.getElementById('study-uid').value = '';
+        document.getElementById('findings').value = '';
+
+        // Update reports table
+        updateReportsTable([data]);
+      })
+      .catch(error => console.error(error));
+    });
+
+    // Fetch and display reports
+    function updateReportsTable(reports) {
+      const reportsTable = document.getElementById('reports-table').getElementsByTagName('tbody')[0];
+      reportsTable.innerHTML = '';
+
+      reports.forEach(report => {
+        const row = document.createElement('tr');
+
+        const patientIdCell = document.createElement('td');
+        patientIdCell.textContent = report.patient_id;
+        row.appendChild(patientIdCell);
+
+        const studyUidCell = document.createElement('td');
+        studyUidCell.textContent = report.study_uid;
+        row.appendChild(studyUidCell);
+
+        const createdAtCell = document.createElement('td');
+        createdAtCell.textContent = report.created_at;
+        row.appendChild(createdAtCell);
+
+        const actionsCell = document.createElement('td');
+        const viewButton = document.createElement('button');
+        viewButton.textContent = 'View';
+        actionsCell.appendChild(viewButton);
+        row.appendChild(actionsCell);
+
+        reportsTable.appendChild(row);
+      });
+    }
+
+    // Fetch initial reports
+    fetch('/api/reports')
+      .then(response => response.json())
+      .then(data => updateReportsTable(data))
+      .catch(error => console.error(error));
+  </script>
+</body>
+</html>
+

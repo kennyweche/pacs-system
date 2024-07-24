@@ -1,0 +1,6 @@
+Flask==2.1.1
+psycopg2==2.9.3
+requests==2.26.0
+pytest==6.2.5
+cornerstone-tools==2.2.0
+
